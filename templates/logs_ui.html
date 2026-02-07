@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Introspector Framework – HTTP Ops Tool</title>
+  <style>
+    :root {
+      --bg:#05030a;
+      --bg-alt:#0f0a1a;
+      --panel:#120c22;
+      --accent:#2aa8ff;
+      --accent-soft:rgba(42,168,255,0.22);
+      --text:#f9fafb;
+      --text-soft:#9ca3af;
+      --border:#1f2933;
+      --muted:#6b7280;
+      --chip:#0b1422;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:radial-gradient(circle at top,#0b1b2f 0,#05030a 55%,#020013 100%);
+      color:var(--text);
+      height:100vh;
+      display:flex;
+      overflow:hidden;
+    }
+    .app{display:flex;flex-direction:column;flex:1;min-width:0}
+    .topbar{
+      padding:12px 20px;
+      border-bottom:1px solid var(--border);
+      background:linear-gradient(to right,rgba(42,168,255,0.12),transparent);
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+    }
+    .topbar-left{display:flex;flex-direction:column;gap:2px}
+    .topbar-title{font-size:12px;text-transform:uppercase;letter-spacing:.18em;color:var(--text-soft)}
+    .topbar-main{font-size:18px;font-weight:650}
+    .topbar-right{display:flex;align-items:center;gap:10px;min-width:0}
+    .topbar-pill{
+      padding:4px 10px;border-radius:999px;border:1px solid var(--accent-soft);
+      color:var(--text-soft);font-size:11px;display:inline-flex;align-items:center;gap:6px;
+      background:rgba(15,23,42,.72)
+    }
+    .pill-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e}
+    .host-box{
+      display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;
+      border:1px solid var(--border);background:rgba(15,23,42,.75);font-size:11px;color:var(--text-soft);
+      max-width:360px;min-width:0
+    }
+    .host-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+    .copy-btn{
+      border:none;outline:none;border-radius:999px;padding:3px 10px;font-size:11px;
+      background:rgba(42,168,255,.18);color:var(--text);cursor:pointer
+    }
+    .copy-btn:hover{background:rgba(42,168,255,.28)}
+    .layout{display:grid;grid-template-columns:340px minmax(0,1fr);flex:1;min-height:0}
+    .sidebar{
+      border-right:1px solid var(--border);
+      background:radial-gradient(circle at top left,#0a2542 0,#05030a 60%);
+      display:flex;flex-direction:column;min-height:0
+    }
+
+    .sidebar-header{
+      padding:12px 14px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      font-size:13px;color:var(--text-soft)
+    }
+    .sidebar-left{
+      display:flex;align-items:center;gap:10px;min-width:0;
+    }
+    .sidebar-right{
+      display:flex;gap:8px;align-items:center;flex-shrink:0;
+    }
+
+    .tag{
+      padding:2px 8px;border-radius:999px;background:rgba(15,23,42,.7);
+      border:1px solid var(--border);font-size:11px;color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .btn-small{
+      border-radius:999px;border:1px solid rgba(42,168,255,.28);background:rgba(42,168,255,.14);
+      padding:5px 12px;font-size:11px;font-weight:650;color:var(--text);cursor:pointer;
+      transition:background .15s ease,border-color .15s ease,transform .05s ease;
+      box-shadow:0 6px 18px rgba(0,0,0,.25)
+    }
+    .btn-small:hover{background:rgba(42,168,255,.22);border-color:rgba(42,168,255,.45)}
+    .btn-small:active{transform:translateY(1px)}
+    .btn-small[disabled]{opacity:.45;cursor:default;box-shadow:none}
+
+    .view-toggle{
+      display:inline-flex;align-items:center;gap:6px;margin-left:6px;
+      padding:4px;border-radius:999px;border:1px solid var(--border);
+      background:rgba(15,23,42,.55)
+    }
+    .icon-btn{
+      width:30px;height:26px;border-radius:10px;border:1px solid transparent;
+      background:transparent;color:var(--text-soft);cursor:pointer;
+      display:inline-flex;align-items:center;justify-content:center;
+      transition:background .15s ease,border-color .15s ease,color .15s ease
+    }
+    .icon-btn:hover{background:rgba(42,168,255,.12);color:var(--text)}
+    .icon-btn.active{
+      background:rgba(42,168,255,.18);
+      border-color:rgba(42,168,255,.35);
+      color:var(--text);
+      box-shadow:0 0 0 1px rgba(42,168,255,.12) inset;
+    }
+
+    /* --- FILTER DROPDOWN --- */
+    .type-filter{ position:relative; display:inline-flex; align-items:center; }
+    .type-menu{
+      position:absolute;
+      top:34px;
+      right:0;
+      z-index:99998;
+      display:none;
+      min-width:160px;
+      background:rgba(15,23,42,.96);
+      border:1px solid rgba(42,168,255,.28);
+      border-radius:12px;
+      padding:6px;
+      box-shadow:0 10px 30px rgba(0,0,0,.55);
+    }
+    .type-item{
+      width:100%;
+      background:transparent;
+      border:0;
+      color:var(--text);
+      text-align:left;
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:12px;
+      font-weight:650;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .type-item:hover{background:rgba(42,168,255,.12)}
+    .type-left{display:inline-flex;align-items:center;gap:10px;min-width:0}
+    .type-box{
+      width:14px;height:14px;border-radius:4px;
+      border:1px solid rgba(255,255,255,.20);
+      background:rgba(255,255,255,.04);
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:12px;line-height:1;
+      color:var(--text);
+      flex:0 0 auto;
+    }
+    .type-label{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .log-list{flex:1;overflow-y:auto;padding:6px}
+    .log-item{
+      border-radius:10px;padding:10px 12px;margin-bottom:8px;
+      background:rgba(15,23,42,.65);border:1px solid transparent;cursor:pointer;
+      display:flex;flex-direction:column;gap:6px
+    }
+    .log-item:hover{border-color:var(--accent-soft);background:rgba(15,23,42,.9)}
+    .log-item.active{
+      border-color:var(--accent);box-shadow:0 0 0 1px rgba(42,168,255,.26);
+      background:linear-gradient(135deg,rgba(42,168,255,.12),rgba(15,23,42,.92))
+    }
+    .log-item.new{
+      border-color: rgba(42,168,255,.75) !important;
+      box-shadow: 0 0 0 1px rgba(42,168,255,.30), 0 0 22px rgba(42,168,255,.22);
+      background: linear-gradient(135deg,rgba(42,168,255,.16),rgba(15,23,42,.92));
+      position:relative;
+    }
+    .log-item.new::after{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius:12px;
+      box-shadow:0 0 18px rgba(42,168,255,.18);
+      animation:newPulse 1.2s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes newPulse{
+      0%,100%{opacity:.35}
+      50%{opacity:.85}
+    }
+
+    .log-row-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px}
+    .log-top-row{display:flex;align-items:center;gap:8px;width:100%}
+    .log-method{
+      font-weight:750;padding:3px 9px;border-radius:999px;font-size:12px;letter-spacing:.06em;text-transform:uppercase
+    }
+    .proto-HTTP{color:#60a5fa;background:rgba(96,165,250,.14);border:1px solid rgba(96,165,250,.25)}
+    .proto-HTTPS{color:#10b981;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25)}
+    .proto-DNS{color:#facc15;background:rgba(250,204,21,.10);border:1px solid rgba(250,204,21,.20)}
+    .proto-SMTP{color:#a78bfa;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.22)}
+    .log-path{font-size:13px;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .log-meta{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+    .log-time{color:#9ca3af;font-size:12px}
+    .log-event{margin-left:auto;flex-shrink:0;padding:2px 8px;border-radius:999px;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+    .log-event-open{color:#f97373;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4)}
+    .log-event-delayer{color:#fbbf24;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4)}
+
+    .main{
+      background:radial-gradient(circle at top right,#0a2542 0,#05030a 60%);
+      display:flex;flex-direction:column;min-height:0;min-width:0;
+      overflow:hidden;
+    }
+    .main-header{
+      padding:12px 18px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;gap:12px
+    }
+    .main-title{font-size:14px;font-weight:600}
+    .main-sub{font-size:11px;color:var(--muted)}
+    .pill-right{display:inline-flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);flex-wrap:wrap;justify-content:flex-end}
+    .circle-small{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+    .badge-count{padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:rgba(15,23,42,.75);font-size:11px}
+    .content{
+      flex:1;
+      overflow-y:auto;
+      padding:10px 14px 16px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height:0
+    }
+    .panel{
+      background:rgba(15,23,42,.78);border-radius:14px;border:1px solid var(--border);
+      padding:10px 12px;display:flex;flex-direction:column;
+      min-height:0;
+      min-width:0;
+    }
+    .panel-header{
+      font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--muted);
+      margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px
+    }
+    .panel-body{font-size:12px;overflow:visible;min-height:0}
+    .kv-table{width:100%;border-collapse:collapse}
+    .kv-table td{padding:3px 2px;vertical-align:top;font-size:12px}
+    .kv-key{color:var(--muted);width:110px;white-space:nowrap}
+    .code-box{
+      background:#020617;border-radius:12px;border:1px solid #111827;padding:12px 14px;
+      font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      font-size:12.5px;line-height:1.42;
+      white-space:pre-wrap;word-break:break-word;
+      overflow:visible;
+      min-width:0;
+    }
+    .empty-state{
+      font-size:12px;color:var(--muted);display:flex;align-items:center;justify-content:center;
+      height:100%;text-align:center
+    }
+    .pill-soft{padding:2px 8px;border-radius:999px;background:rgba(15,23,42,.75);border:1px solid var(--border);font-size:10px;color:var(--muted)}
+    .toast{
+      position:fixed;bottom:18px;right:20px;background:rgba(15,23,42,.92);color:var(--text);
+      padding:8px 12px;border-radius:999px;border:1px solid var(--accent-soft);font-size:12px;
+      opacity:0;transform:translateY(10px);transition:opacity .18s ease,transform .18s ease;pointer-events:none
+    }
+    .toast.show{opacity:1;transform:translateY(0)}
+
+    .reqresp{display:flex;flex-direction:column;gap:10px}
+    .reqresp.split{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+      gap:10px;
+      align-items:stretch;
+    }
+    .reqresp.split .panel{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+    .reqresp.split .panel-body{
+      flex:1;
+      min-height:0;
+    }
+    .reqresp.split .code-box{
+      height:100%;
+    }
+
+    @media (max-width:1100px){
+      .reqresp.split{grid-template-columns:1fr}
+      .reqresp.split .panel{height:auto}
+      .reqresp.split .code-box{height:auto}
+    }
+    @media (max-width:900px){
+      .layout{grid-template-columns:1fr}
+      .sidebar{max-height:40%}
+      .topbar{flex-direction:column;align-items:flex-start}
+      body{overflow:hidden}
+    }
+    .kv-table{table-layout:fixed;width:100%}
+    .kv-key{width:110px}
+
+    .ipline{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+    }
+    #fieldIp{
+      display:inline-block;
+      min-width:0;
+      max-width:360px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    #ctxMenu{
+      position:fixed;
+      z-index:99999;
+      display:none;
+      min-width:140px;
+      background:rgba(15,23,42,.96);
+      border:1px solid rgba(42,168,255,.28);
+      border-radius:12px;
+      padding:6px;
+      box-shadow:0 10px 30px rgba(0,0,0,.55);
+    }
+    #ctxMenu button{
+      width:100%;
+      background:transparent;
+      border:0;
+      color:var(--text);
+      text-align:left;
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:12px;
+      font-weight:650;
+    }
+    #ctxMenu button:hover{
+      background:rgba(42,168,255,.12);
+    }
+    #ctxMenu .danger{
+      color:#fb7185;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-main">INTROSPECTOR FRAMEWORK</div>
+        <div class="topbar-title">HTTP Ops - Web Console</div>
+      </div>
+      <div class="topbar-right">
+        <div class="host-box">
+          <span class="host-text" id="cbHostText"></span>
+          <button class="copy-btn" onclick="copyCallbackHost()">Copy</button>
+        </div>
+        <div class="topbar-pill">
+          <span class="pill-dot"></span>
+          <span id="connStatus">listening on /{{ log_path }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-left">
+            <span>Requests</span>
+            <span class="tag" id="totalCount" title="Total events">0 events</span>
+          </div>
+
+          <div class="sidebar-right">
+            <div class="type-filter" id="typeFilter">
+              <button class="icon-btn" id="typeBtn" type="button" title="Filter (HTTP/DNS/SMTP)" aria-label="Filter">
+                <!-- funnel icon -->
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                </svg>
+              </button>
+
+              <div class="type-menu" id="typeMenu" aria-hidden="true">
+                <button class="type-item" type="button" data-type="HTTP">
+                  <span class="type-left"><span class="type-box" id="chk_HTTP"></span><span class="type-label">HTTP</span></span>
+                  <span></span>
+                </button>
+                <button class="type-item" type="button" data-type="HTTPS">
+                  <span class="type-left"><span class="type-box" id="chk_HTTPS"></span><span class="type-label">HTTPS</span></span>
+                  <span></span>
+                </button>
+                <button class="type-item" type="button" data-type="DNS">
+                  <span class="type-left"><span class="type-box" id="chk_DNS"></span><span class="type-label">DNS</span></span>
+                  <span></span>
+                </button>
+                <button class="type-item" type="button" data-type="SMTP">
+                  <span class="type-left"><span class="type-box" id="chk_SMTP"></span><span class="type-label">SMTP</span></span>
+                  <span></span>
+                </button>
+              </div>
+            </div>
+
+            <button class="btn-small" onclick="manualRefresh()">Refresh</button>
+            <button class="btn-small" onclick="deleteLogs()">Delete</button>
+          </div>
+        </div>
+
+        <div class="log-list" id="logList">
+          <div class="empty-state">Waiting for traffic…<br/><span style="font-size:11px;">Send callbacks to this host and they will appear here.</span></div>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="main-header">
+          <div>
+            <div class="main-title" id="detailTitle">No request selected</div>
+            <div class="main-sub" id="detailSub">Click on a request in the left pane to inspect details.</div>
+          </div>
+
+          <div class="pill-right">
+            <span class="circle-small"></span>
+            <span id="autoRefreshLabel">Auto refresh: 15s</span>
+            <span class="badge-count" id="protoBadge">–</span>
+
+            <div class="view-toggle" title="Layout">
+              <button class="icon-btn" id="btnStack" onclick="setViewMode('stack')" aria-label="Stack view">≡</button>
+              <button class="icon-btn" id="btnSplit" onclick="setViewMode('split')" aria-label="Split view">⫶</button>
+            </div>
+
+            <button class="btn-small" id="copyUrlBtn" onclick="copySelectedUrl()" disabled>Copy URL</button>
+          </div>
+        </div>
+
+        <div class="content">
+          <div class="panel" style="display: table !important;">
+            <div class="panel-header">
+              <span>Overview</span>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <span class="pill-soft" id="findingLabel">–</span>
+                <span class="pill-soft" id="timeLabel">–</span>
+              </div>
+            </div>
+            <div class="panel-body">
+              <table class="kv-table">
+                <tr>
+                  <td class="kv-key">IP</td>
+                  <td>
+                    <div class="ipline">
+                        <span id="fieldIp">–</span>
+                        <button class="btn-small" onclick="loadWhois()">Whois</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr><td class="kv-key">Protocol</td><td id="fieldProto">–</td></tr>
+                <tr><td class="kv-key">Method</td><td id="fieldMethod">–</td></tr>
+                <tr><td class="kv-key">Path</td><td id="fieldPath">–</td></tr>
+              </table>
+            </div>
+          </div>
+
+          <div id="reqRespWrap" class="reqresp">
+            <div class="panel">
+              <div class="panel-header">
+                <span>Request</span>
+                <span class="pill-soft" id="reqSize">0 bytes</span>
+              </div>
+              <div class="panel-body">
+                <div class="code-box" id="requestBox">(empty)</div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <span>Response</span>
+                <span class="pill-soft" id="respSize">0 bytes</span>
+              </div>
+              <div class="panel-body">
+                <div class="code-box" id="responseBox">(empty)</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" style="display: table !important;">
+            <div class="panel-header">
+              <span>WHOIS</span>
+              <span class="pill-soft" id="whoisStatus">OK</span>
+            </div>
+            <div class="panel-body">
+              <div class="code-box" id="whoisBox">(empty)</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Copied to clipboard</div>
+  <div id="ctxMenu">
+    <button id="ctxDelete" class="danger">Delete</button>
+  </div>
+
+  <script>
+    let logs = [];
+    let activeIndex = null;
+    let refreshInterval = 15000;
+    let callbackBase = "";
+    let selectedFullUrl = "";
+    let viewMode = "stack";
+
+    let seenKeys = new Set();
+    let newKeys = new Set();
+
+    const ALL_TYPES = ["HTTP","HTTPS","DNS","SMTP"];
+    let activeTypes = new Set(ALL_TYPES);
+
+    const typeBtn = document.getElementById("typeBtn");
+    const typeMenu = document.getElementById("typeMenu");
+
+    function showTypeMenu(){
+      if (!typeMenu) return;
+      typeMenu.style.display = "block";
+      typeMenu.setAttribute("aria-hidden","false");
+      updateTypeMenuUI();
+    }
+    function hideTypeMenu(){
+      if (!typeMenu) return;
+      typeMenu.style.display = "none";
+      typeMenu.setAttribute("aria-hidden","true");
+    }
+
+    function isAllSelected(){
+      for (const t of ALL_TYPES) if (!activeTypes.has(t)) return false;
+      return true;
+    }
+
+    function setChk(id, on){
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = on ? "✓" : "";
+    }
+
+    function updateTypeMenuUI(){
+      setChk("chk_HTTP", activeTypes.has("HTTP"));
+      setChk("chk_HTTPS", activeTypes.has("HTTPS"));
+      setChk("chk_DNS",  activeTypes.has("DNS"));
+      setChk("chk_SMTP", activeTypes.has("SMTP"));
+
+      // botón embudo: se ilumina SOLO si hay filtro (no están los 3)
+      if (typeBtn) typeBtn.classList.toggle("active", !isAllSelected());
+    }
+
+    function enforceNonEmpty(){
+      if (activeTypes.size > 0) return true;
+      // si desmarcan todo, reactivamos HTTP para evitar "nada"
+      activeTypes = new Set(["HTTP"]);
+      updateTypeMenuUI();
+      showToast("At least 1 type");
+      return false;
+    }
+
+    function applyTypeFilter(){
+      const r = renderList();
+
+      if (!r.visibleCount) {
+        activeIndex = null;
+        clearDetails();
+        return;
+      }
+
+      if (activeIndex === null || !r.visibleIndexSet.has(activeIndex)) {
+        activeIndex = null;
+        selectLog(r.firstVisibleIndex);
+      }
+    }
+
+    if (typeBtn) {
+      typeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (typeMenu.style.display === "block") hideTypeMenu();
+        else showTypeMenu();
+      });
+    }
+
+    if (typeMenu) {
+      typeMenu.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const btn = e.target.closest("button[data-type]");
+        if (!btn) return;
+        const t = btn.getAttribute("data-type");
+
+        if (ALL_TYPES.includes(t)) {
+          if (activeTypes.has(t)) activeTypes.delete(t);
+          else activeTypes.add(t);
+          enforceNonEmpty();
+          updateTypeMenuUI();
+          applyTypeFilter();
+        }
+      });
+    }
+
+    document.addEventListener("click", hideTypeMenu);
+    document.addEventListener("scroll", hideTypeMenu, true);
+    window.addEventListener("resize", hideTypeMenu);
+
+    function logKey(log){
+      const t = log.time || "";
+      const ip = log.ip || "";
+      const p = (log.proto || "").toUpperCase();
+      const m = (log.method || "").toUpperCase();
+      const path = log.path || "";
+      return `${t}|${ip}|${p}|${m}|${path}`;
+    }
+
+    function loadSeen(){
+      try{
+        const raw = localStorage.getItem("introspector_seen_keys");
+        if (!raw) return;
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) seenKeys = new Set(arr);
+      }catch(e){}
+    }
+
+    function saveSeen(){
+      try{
+        const arr = Array.from(seenKeys);
+        const MAX = 800;
+        const trimmed = arr.length > MAX ? arr.slice(arr.length - MAX) : arr;
+        localStorage.setItem("introspector_seen_keys", JSON.stringify(trimmed));
+      }catch(e){}
+    }
+
+    const ctxMenu = document.getElementById("ctxMenu");
+    const ctxDelete = document.getElementById("ctxDelete");
+    let ctxIndex = null;
+
+    function hideCtx() {
+      ctxMenu.style.display = "none";
+      ctxIndex = null;
+    }
+
+    function showCtx(index, x, y) {
+      ctxIndex = index;
+      ctxMenu.style.left = x + "px";
+      ctxMenu.style.top = y + "px";
+      ctxMenu.style.display = "block";
+    }
+
+    document.addEventListener("click", hideCtx);
+    document.addEventListener("scroll", hideCtx, true);
+    window.addEventListener("resize", hideCtx);
+
+    async function deleteOne(index) {
+      try {
+        const res = await fetch(`/api/logs/delete/${index}`, { method: "DELETE" });
+        if (!res.ok) {
+          showToast("Failed to delete");
+          return;
+        }
+        activeIndex = null;
+        await fetchLogs();
+        showToast("Deleted");
+      } catch (e) {
+        showToast("Failed to delete");
+      }
+    }
+
+    ctxDelete.addEventListener("click", () => {
+      if (ctxIndex === null) return hideCtx();
+      const i = ctxIndex;
+      hideCtx();
+      deleteOne(i);
+    });
+
+    function countryToFlagEmoji(code) {
+      if (!code || code.length !== 2) return "";
+      const base = 127397;
+      return String.fromCodePoint(
+        code[0].toUpperCase().charCodeAt(0) + base,
+        code[1].toUpperCase().charCodeAt(0) + base
+      );
+    }
+
+    function escapeHTML(v){
+      return String(v ?? "")
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#39;");
+    }
+
+    function setViewMode(mode) {
+      viewMode = (mode === "split") ? "split" : "stack";
+      const wrap = document.getElementById("reqRespWrap");
+      if (!wrap) return;
+      wrap.classList.remove("split");
+      if (viewMode === "split") wrap.classList.add("split");
+
+      const b1 = document.getElementById("btnStack");
+      const b2 = document.getElementById("btnSplit");
+      if (b1) b1.classList.toggle("active", viewMode === "stack");
+      if (b2) b2.classList.toggle("active", viewMode === "split");
+
+      try { localStorage.setItem("introspector_view_mode", viewMode); } catch (e) {}
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch("/api/logs", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        logs = (data.logs || []);
+
+        newKeys = new Set();
+        for (const lg of logs){
+          const k = logKey(lg);
+          if (!seenKeys.has(k)) newKeys.add(k);
+        }
+
+        applyTypeFilter();
+      } catch (e) {}
+    }
+
+    function manualRefresh() {
+      fetchLogs();
+    }
+
+    async function deleteLogs() {
+      if (!confirm("Delete all logs?")) return;
+      try {
+        const res = await fetch("/api/logs/clear", { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          showToast("Failed to delete");
+          return;
+        }
+        logs = [];
+        activeIndex = null;
+        newKeys = new Set();
+        seenKeys = new Set();
+        try { localStorage.removeItem("introspector_seen_keys"); } catch(e){}
+        renderList();
+        document.getElementById("totalCount").textContent = "0 events";
+        document.getElementById("totalCount").title = "Total events";
+        clearDetails();
+        showToast("Deleted");
+      } catch (e) {
+        showToast("Failed to delete");
+      }
+    }
+
+    function renderList() {
+      const listEl = document.getElementById("logList");
+      listEl.innerHTML = "";
+
+      const visibleIndexSet = new Set();
+      let visibleCount = 0;
+      let firstVisibleIndex = null;
+
+      if (!logs.length) {
+        listEl.innerHTML = '<div class="empty-state">Waiting for traffic…<br/><span style="font-size:11px;">Send callbacks to this host and they will appear here.</span></div>';
+        clearDetails();
+        document.getElementById("totalCount").textContent = "0 events";
+        document.getElementById("totalCount").title = "Total events: 0";
+        return { visibleCount: 0, firstVisibleIndex: null, visibleIndexSet };
+      }
+
+      logs.forEach((log, idx) => {
+        const proto = (log.proto || "HTTP").toUpperCase();
+        const normalizedProto = ALL_TYPES.includes(proto) ? proto : "HTTP";
+        if (!activeTypes.has(normalizedProto)) return;
+
+        visibleIndexSet.add(idx);
+        visibleCount += 1;
+        if (firstVisibleIndex === null) firstVisibleIndex = idx;
+
+        const item = document.createElement("div");
+        const k = logKey(log);
+        const isNew = newKeys.has(k);
+        item.className = "log-item" + (idx === activeIndex ? " active" : "") + (isNew ? " new" : "");
+        item.onclick = () => selectLog(idx);
+
+        item.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          showCtx(idx, e.clientX, e.clientY);
+        });
+
+        const protoClass = ["HTTP","HTTPS","DNS","SMTP"].includes(normalizedProto) ? normalizedProto : "HTTP";
+
+        let eventTag = "";
+        if (log.event === "open_redirect") {
+          eventTag = '<span class="log-event log-event-open">FOLLOW REDIRECT</span>';
+        } else if (log.event === "delayer_request") {
+          eventTag = '<span class="log-event log-event-delayer">DELAYER</span>';
+        }
+
+        const safeProto = escapeHTML(normalizedProto);
+        const safePath = escapeHTML(log.path || "/");
+
+        const top = document.createElement("div");
+        top.className = "log-row-top";
+        top.innerHTML = `
+          <div class="log-top-row">
+            <span class="log-method proto-${protoClass}">${safeProto}</span>
+            <span class="log-path" title="${safePath}">${safePath}</span>
+            ${eventTag}
+          </div>
+        `;
+
+        const meta = document.createElement("div");
+        meta.className = "log-meta";
+
+        const country = (log.country || "").toString().trim().toUpperCase();
+        const flag = countryToFlagEmoji(country);
+        const ipLabel = flag ? `${log.ip || "-"} ${flag}` : (log.ip || "-");
+
+        meta.innerHTML = `
+          <span>IP: ${escapeHTML(ipLabel)}</span>
+          <span class="log-time">${escapeHTML(log.time || "")}</span>
+        `;
+
+        item.appendChild(top);
+        item.appendChild(meta);
+        listEl.appendChild(item);
+      });
+
+      if (!visibleCount) {
+        listEl.innerHTML = '<div class="empty-state">No events for selected types.</div>';
+        clearDetails();
+      }
+
+      //  “X events”
+      const total = logs.length;
+      const tag = document.getElementById("totalCount");
+      tag.textContent = `${visibleCount} events`;
+      tag.title = isAllSelected()
+        ? `Total events: ${total}`
+        : `Showing ${visibleCount} of ${total} (filtered)`;
+
+      updateTypeMenuUI();
+      return { visibleCount, firstVisibleIndex, visibleIndexSet };
+    }
+
+    function clearDetails() {
+      activeIndex = null;
+      document.getElementById("detailTitle").textContent = "No request selected";
+      document.getElementById("detailSub").textContent = "Click on a request in the left pane to inspect details.";
+      document.getElementById("timeLabel").textContent = "–";
+      document.getElementById("findingLabel").textContent = "–";
+      document.getElementById("fieldIp").textContent = "–";
+      document.getElementById("fieldProto").textContent = "–";
+      document.getElementById("fieldMethod").textContent = "–";
+      document.getElementById("fieldPath").textContent = "–";
+      document.getElementById("protoBadge").textContent = "–";
+      document.getElementById("requestBox").textContent = "(empty)";
+      document.getElementById("responseBox").textContent = "(empty)";
+      document.getElementById("reqSize").textContent = "0 bytes";
+      document.getElementById("respSize").textContent = "0 bytes";
+      document.getElementById("whoisBox").textContent = "(empty)";
+      document.getElementById("whoisStatus").textContent = "OK";
+      selectedFullUrl = "";
+      const btn = document.getElementById("copyUrlBtn");
+      if (btn) btn.disabled = true;
+    }
+
+    function selectLog(idx) {
+      activeIndex = idx;
+      renderList();
+
+      const log = logs[idx];
+      if (!log) return;
+
+      const k = logKey(log);
+      seenKeys.add(k);
+      newKeys.delete(k);
+      saveSeen();
+
+      const proto = (log.proto || "HTTP").toUpperCase();
+      document.getElementById("detailTitle").textContent = `${proto} ${log.path || "/"}`;
+
+      const country = (log.country || "").toString().trim().toUpperCase();
+      const flag = countryToFlagEmoji(country);
+      const ipWithFlag = flag ? `${log.ip || "-"} ${flag}` : (log.ip || "-");
+      const ipRaw = (log.ip || "-");
+
+      document.getElementById("detailSub").textContent = `from ${ipRaw} • ${log.time || ""}`;
+      document.getElementById("timeLabel").textContent = log.time || "–";
+      document.getElementById("fieldIp").textContent = ipWithFlag;
+      document.getElementById("fieldProto").textContent = proto;
+      document.getElementById("fieldMethod").textContent = log.method || "–";
+      document.getElementById("fieldPath").textContent = log.path || "/";
+
+      document.getElementById("protoBadge").textContent = proto;
+
+      const finding = log.event || "";
+      const findingEl = document.getElementById("findingLabel");
+      if (finding === "open_redirect") {
+        findingEl.textContent = "FOLLOW REDIRECT";
+        findingEl.style.color = "#f97373";
+      } else if (finding === "delayer_request") {
+        findingEl.textContent = "DELAYER";
+        findingEl.style.color = "#fbbf24";
+      } else {
+        findingEl.textContent = "–";
+        findingEl.style.color = "";
+      }
+
+      const reqRaw = log.request_raw || "";
+      const respRaw = log.response_raw || "";
+
+      document.getElementById("requestBox").textContent = reqRaw || "(empty)";
+      document.getElementById("responseBox").textContent = respRaw || "(empty)";
+
+      document.getElementById("reqSize").textContent = reqRaw ? (reqRaw.length + " bytes") : "0 bytes";
+      document.getElementById("respSize").textContent = respRaw ? (respRaw.length + " bytes") : "0 bytes";
+
+      document.getElementById("whoisBox").textContent = "(empty)";
+      document.getElementById("whoisStatus").textContent = "OK";
+
+      selectedFullUrl = callbackBase + (log.path || "/");
+      const btn = document.getElementById("copyUrlBtn");
+      if (btn) btn.disabled = false;
+
+      try {
+        const mainContent = document.querySelector(".content");
+        if (mainContent) mainContent.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (e) {}
+    }
+
+    async function loadWhois() {
+      const box = document.getElementById("whoisBox");
+      const statusEl = document.getElementById("whoisStatus");
+      if (activeIndex === null || !logs[activeIndex]) {
+        box.textContent = "(no request selected)";
+        statusEl.textContent = "ERR";
+        return;
+      }
+      const ip = logs[activeIndex].ip;
+      if (!ip) {
+        box.textContent = "(no IP)";
+        statusEl.textContent = "ERR";
+        return;
+      }
+      box.textContent = "Loading WHOIS for " + ip + "...";
+      statusEl.textContent = "…";
+      try {
+        const res = await fetch(`/api/whois?ip=${encodeURIComponent(ip)}`, { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          box.textContent = data.error ? ("Error: " + data.error) : "Error doing WHOIS";
+          statusEl.textContent = "ERR";
+          return;
+        }
+        box.textContent = data.text || "(no whois data)";
+        statusEl.textContent = "OK" + (data.cached ? " (cached)" : "");
+      } catch (e) {
+        box.textContent = "Error: " + e;
+        statusEl.textContent = "ERR";
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1400);
+    }
+
+    function copyCallbackHost() {
+      const text = callbackBase;
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(() => showToast("Callback host copied"))
+          .catch(() => showToast("Failed to copy"));
+      } else {
+        const tmp = document.createElement("textarea");
+        tmp.value = text;
+        document.body.appendChild(tmp);
+        tmp.select();
+        try {
+          document.execCommand("copy");
+          showToast("Callback host copied");
+        } catch (e) {
+          showToast("Failed to copy");
+        }
+        document.body.removeChild(tmp);
+      }
+    }
+
+    function copySelectedUrl() {
+      if (!selectedFullUrl) {
+        showToast("No request selected");
+        return;
+      }
+      const text = selectedFullUrl;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(() => showToast("Request URL copied"))
+          .catch(() => showToast("Failed to copy"));
+      } else {
+        const tmp = document.createElement("textarea");
+        tmp.value = text;
+        document.body.appendChild(tmp);
+        tmp.select();
+        try {
+          document.execCommand("copy");
+          showToast("Request URL copied");
+        } catch (e) {
+          showToast("Failed to copy");
+        }
+        document.body.removeChild(tmp);
+      }
+    }
+
+    window.addEventListener("load", () => {
+      loadSeen();
+
+      callbackBase = "{{ dns_example }}" || window.location.origin;
+      document.getElementById("cbHostText").textContent = callbackBase;
+
+      try {
+        const saved = localStorage.getItem("introspector_view_mode");
+        if (saved === "split" || saved === "stack") viewMode = saved;
+      } catch (e) {}
+      setViewMode(viewMode);
+
+      updateTypeMenuUI();
+
+      document.getElementById("autoRefreshLabel").textContent = "Auto refresh: " + Math.round(refreshInterval/1000) + "s";
+      fetchLogs();
+      setInterval(fetchLogs, refreshInterval);
+    });
+  </script>
+</body>
+</html>
